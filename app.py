@@ -5,11 +5,13 @@ import os
 from lib.whisper.transcribe import transcribe_audio
 from functools import wraps
 from dotenv import load_dotenv
+from asgiref.wsgi import WsgiToAsgi
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
+asgi_app = WsgiToAsgi(app)
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'ogg', 'flac'}
@@ -76,4 +78,5 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    import uvicorn
+    uvicorn.run(asgi_app, host="0.0.0.0", port=8000)
