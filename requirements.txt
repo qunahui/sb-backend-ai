@@ -6,6 +6,7 @@ torch
 transformers
 soundfile
 flask
+flask-cors
 werkzeug
 librosa
 asgiref

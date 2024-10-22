@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat UI</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      .container {
+        display: flex;
+        flex: 1;
+      }
+      .chat-area {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        border-right: 1px solid #ccc;
+      }
+      .json-area {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background-color: #f0f0f0;
+        max-height: 87vh;
+        overflow-y: auto;
+      }
+      .input-area {
+        display: flex;
+        padding: 20px;
+        background-color: #f0f0f0;
+      }
+      #userInput {
+        flex: 1;
+        padding: 10px;
+        font-size: 16px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        margin-left: 10px;
+        cursor: pointer;
+      }
+      .message {
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 5px;
+      }
+      .user-message {
+        background-color: #e6f2ff;
+        align-self: flex-end;
+      }
+      .llm-message {
+        background-color: #f0f0f0;
+        align-self: flex-start;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="chat-area" id="chatArea"></div>
+      <div class="json-area" id="jsonArea"></div>
+    </div>
+    <div class="input-area">
+      <input type="text" id="userInput" placeholder="Type your message..." />
+      <button id="sendButton">Send</button>
+      <button id="audioButton">🎤</button>
+    </div>
+
+    <script>
+      const chatArea = document.getElementById('chatArea');
+      const jsonArea = document.getElementById('jsonArea');
+      const userInput = document.getElementById('userInput');
+      const audioButton = document.getElementById('audioButton');
+      const sendButton = document.getElementById('sendButton');
+
+      let isRecording = false;
+      let mediaRecorder;
+      let audioChunks = [];
+      let audioStream;
+
+      // Request microphone permission
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          audioStream = stream;
+        })
+        .catch((error) => {
+          console.error('Error accessing microphone:', error);
+          audioButton.disabled = true;
+          audioButton.title = 'Microphone access denied';
+        });
+
+      // Generate and store UUID
+      let uuid = localStorage.getItem('chatUUID');
+      if (!uuid) {
+        uuid = generateUUID();
+        localStorage.setItem('chatUUID', uuid);
+      }
+
+      // Remove UUID on page unload
+      window.addEventListener('beforeunload', () => {
+        localStorage.removeItem('chatUUID');
+      });
+
+      // Function to generate UUID
+      function generateUUID() {
+        return '9f90b923-221a-4f39-bdb2-47c55a8be3b1';
+
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+          /[xy]/g,
+          function (c) {
+            var r = (Math.random() * 16) | 0,
+              v = c == 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          }
+        );
+      }
+
+      let lifestyleData = [];
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        await sendMessage({ message: '' });
+      });
+
+      async function getLifestyle() {
+        try {
+          const response = await fetch(
+            'http://127.0.0.1:8000/lifestyle?timestamp=' + Date.now(),
+            {
+              method: 'GET',
+              headers: {
+                'X-SECRET-API-KEY': '1234567890',
+                'X-UUID': uuid,
+              },
+            }
+          );
+
+          lifestyleData = (await response.json())?.data;
+        } catch (error) {
+          console.error('Error fetching lifestyle data:', error);
+        }
+      }
+
+      async function sendMessage({ message }) {
+        try {
+          const formData = new FormData();
+          if (message) {
+            formData.append('message', message);
+            displayMessage('user', message);
+          }
+          formData.append('timestamp', Date.now());
+
+          const response = await fetch('http://127.0.0.1:8000/chat', {
+            method: 'POST',
+            headers: {
+              'X-SECRET-API-KEY': '1234567890',
+              'X-UUID': uuid,
+            },
+            body: formData,
+          });
+
+          const data = await response.json();
+          displayMessage('llm', data?.response?.data?.followUpQuestion);
+          displayJSON(data);
+        } catch (error) {
+          console.error('Error sending message:', error);
+        }
+      }
+
+      function displayMessage(sender, message) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message', `${sender}-message`);
+        messageElement.textContent = message;
+        chatArea.appendChild(messageElement);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      }
+
+      function displayJSON(data) {
+        jsonArea.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      }
+
+      async function toggleRecording() {
+        if (!isRecording) {
+          if (!audioStream) {
+            console.error('No audio stream available');
+            return;
+          }
+
+          mediaRecorder = new MediaRecorder(audioStream);
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            await sendAudio(audioBlob);
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          audioButton.textContent = '⏹️';
+        } else {
+          mediaRecorder.stop();
+          isRecording = false;
+          audioButton.textContent = '🎤';
+        }
+      }
+
+      async function sendAudio(audioBlob) {
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'audio.wav');
+
+        try {
+          const response = await fetch('http://127.0.0.1:8000/transcribe', {
+            method: 'POST',
+            headers: {
+              'X-SECRET-API-KEY': '1234567890',
+              'X-UUID': uuid,
+            },
+            body: formData,
+          });
+
+          const data = await response.json();
+          displayMessage('user', data.transcription);
+          displayMessage('llm', data?.response?.data?.followUpQuestion);
+          displayJSON(data);
+        } catch (error) {
+          console.error('Error sending audio:', error);
+        }
+      }
+
+      sendButton.addEventListener('click', () => {
+        sendMessage({ message: userInput.value.trim() });
+        userInput.value = '';
+      });
+
+      userInput.addEventListener('keypress', function (event) {
+        if (event.key === 'Enter') {
+          sendMessage({ message: userInput.value.trim() });
+          userInput.value = '';
+        }
+      });
+    </script>
+  </body>
+</html>
