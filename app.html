@@ -109,6 +109,11 @@
         localStorage.removeItem('chatUUID');
       });
 
+      audioButton.addEventListener('click', () => {
+        console.log('Audio button clicked');
+        toggleRecording();
+      });
+
       // Function to generate UUID
       function generateUUID() {
         return '9f90b923-221a-4f39-bdb2-47c55a8be3b1';

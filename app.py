@@ -89,7 +89,7 @@ def transcribe_audio_endpoint():
     return jsonify({"error": "File type not allowed"}), 400
 
 def process_transcription(transcription, uuid, timestamp):
-    lifestyle_api_url = "http://127.0.0.1:3000/api/lifestyle"
+    lifestyle_api_url = os.getenv('SIGNSBEAT_API_URL') + "/api/lifestyle"
     form_data = {
         "timestamp": timestamp,
         "message": transcription
@@ -123,7 +123,7 @@ def health_check():
 @app.route('/lifestyle', methods=['GET'])
 @require_api_key
 def lifestyle():
-    lifestyle_api_url = "http://127.0.0.1:3000/api/lifestyle"
+    lifestyle_api_url = os.getenv('SIGNSBEAT_API_URL') + "/api/lifestyle"
     headers = {
       "X-SECRET-API-KEY": "123",
       "X-UUID": request.headers.get('X-UUID')
